@@ -10,22 +10,25 @@ CLASS_NAMES = MODEL_WEIGHTS.meta['categories']
 # https://stackoverflow.com/questions/36459969/how-to-convert-a-list-to-a-dictionary-with-indexes-as-values
 CLASS_NAMES_DICT = {k: v for v, k in enumerate(CLASS_NAMES)}
 
-def image_overlay(image, segmented_image):
+
+def remove_bg(image, segmented_image):
+
+    # Create mask from segments
     segmented_image = np.array(segmented_image)
     segmented_image = cv2.cvtColor(segmented_image, cv2.COLOR_RGB2BGR)
     mask = cv2.cvtColor(segmented_image, cv2.COLOR_BGR2GRAY)
     mask = cv2.threshold(mask, 10, 255, cv2.THRESH_BINARY)[1]
-    #mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
-    # add green background to the segmented image
-    #segmented_image[mask == [0,0,0]] = [0, 255, 0]
-    imagee = np.zeros(image.shape, np.uint8)
-    imagee[:] = (0, 255, 0)
 
-    output_image = cv2.bitwise_and(image, image, dst=imagee, mask=mask)
+    # Add green background to the segmented image
+    green_bg = np.zeros(image.shape, np.uint8)
+    green_bg[:] = (0, 255, 0)
+
+    # Crop image and add a green background
+    output_image = cv2.bitwise_and(image, image, dst=green_bg, mask=mask)
 
     return output_image
 
-
+# Remove all detected segments except class_name
 def filter_class(img_arr, class_name):
     class_int = CLASS_NAMES_DICT[class_name]
     img_arr[img_arr != class_int] = 0
@@ -60,8 +63,12 @@ with torch.no_grad():
 output_predictions = output.argmax(0)
 output_predictions = output_predictions.byte().cpu().numpy()
 filtered = filter_class(output_predictions, 'person')
+
 r = Image.fromarray(output_predictions).resize(input_image.size)
-r = image_overlay(np.array(input_image, dtype=np.uint8), r)
-#r.putpalette(colors)
-cv2.imwrite('./images/output/example_output.png', r[:,:,::-1]) # Save image in RGB format
-#cv2.imshow('output', r[:,:,::-1])
+r = remove_bg(np.array(input_image, dtype=np.uint8), r)
+r = cv2.cvtColor(np.array(r), cv2.COLOR_RGB2BGR)
+
+cv2.imwrite('./images/output/example_output.png', r) # Save image in RGB format
+cv2.imshow('image', r)
+if cv2.waitKey(0):
+    cv2.destroyAllWindows()
