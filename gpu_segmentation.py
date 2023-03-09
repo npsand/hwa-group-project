@@ -5,6 +5,7 @@ from PIL import Image
 import cv2
 import numpy as np
 import argparse
+from time import perf_counter
 
 MODEL_WEIGHTS = FCN_ResNet101_Weights.DEFAULT
 CLASS_NAMES = MODEL_WEIGHTS.meta['categories']
@@ -15,11 +16,15 @@ CLASS_NAMES_DICT = {k: v for v, k in enumerate(CLASS_NAMES)}
                 'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep',
                 'sofa', 'train', 'tvmonitor']"""
 argparser = argparse.ArgumentParser()
-argparser.add_argument('-c', '--crop-image', type=str, metavar='', required=True, help='Path to image of objects to be cropped out')
-argparser.add_argument('-bg', '--background-image', type=str, metavar='',  help='Path to background image to place the cropped objects on. Default is a green background.')
-argparser.add_argument('-d', '--device', choices=['cpu', 'gpu'], default='cpu', type=str, help='Device to use (default=cpu)')
+argparser.add_argument('-c', '--crop-image', type=str, metavar='', required=True,
+                       help='Path to image of objects to be cropped out')
+argparser.add_argument('-o', '--crop-object', type=str, metavar='', required=True, nargs='+', choices=CLASS_NAMES,
+                       help=f'Object to be cropped from the image. List of objects: {CLASS_NAMES}')
+argparser.add_argument('-bg', '--background-image', type=str, metavar='',
+                       help='Path to background image to place the cropped objects on. Default is a green background.')
+argparser.add_argument('-d', '--device', choices=['cpu', 'gpu'], default='cpu', type=str,
+                       help='Device to use (default=cpu)')
 argparser.add_argument('-s', '--save', action='store_true', help='Save output file')
-argparser.add_argument('-o', '--crop-object', type=str, metavar='', required=True, choices=CLASS_NAMES, help=f'Object to be cropped from the image. List of objects: {CLASS_NAMES}')
 args = argparser.parse_args()
 
 
@@ -45,11 +50,13 @@ def change_bg(image, segmented_image, bg_image=None):
 
     return output_image
 
-# Remove all detected segments except class_name
-def filter_class(img_arr, class_name):
-    class_int = CLASS_NAMES_DICT[class_name]
-    img_arr[img_arr != class_int] = 0
-    return img_arr
+# Remove all detected segments except class_names
+def filter_class(img_arr, class_names):
+    class_ints = [CLASS_NAMES_DICT[cn] for cn in class_names]
+    filtered_arr = img_arr.copy()
+    for class_int in class_ints:
+        filtered_arr[filtered_arr != class_int] = 0
+    return filtered_arr
 
 device = None
 if args.device == 'gpu':
@@ -65,6 +72,9 @@ else:
 
 
 model = torch.hub.load('pytorch/vision', 'fcn_resnet101', weights=MODEL_WEIGHTS)
+
+start_time = perf_counter()
+
 model.to(device)
 
 # Load the image and prepare it for input to the model
@@ -84,6 +94,12 @@ with torch.no_grad():
 # Save the output segmentation mask
 output_predictions = output.argmax(0)
 output_predictions = output_predictions.byte().cpu().numpy()
+
+stop_time = perf_counter()
+
+print(f'Time elapsed in segmentation: {stop_time - start_time}')
+
+print(args.crop_object)
 filtered = filter_class(output_predictions, args.crop_object)
 
 bg_image = None
