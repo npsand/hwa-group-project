@@ -7,7 +7,7 @@ Recommended to use Anaconda or Miniconda for running the project.
 
 ### Create the environment 
 
-```conda env create --name hwaenv --file=env.yml```
+```conda env create --name hwaenv --file=env.yaml```
 
 ## Running
 ```
