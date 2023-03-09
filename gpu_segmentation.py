@@ -4,6 +4,16 @@ from torchvision.models.segmentation import FCN_ResNet101_Weights
 from PIL import Image
 import cv2
 import numpy as np
+import argparse
+
+
+argparser = argparse.ArgumentParser()
+argparser.add_argument('-c', '--crop-image', type=str, metavar='', required=True, help='Path to image of objects to be cropped out')
+argparser.add_argument('-bg', '--background-image', type=str, metavar='', required=True, help='Path to background image to place the cropped objects on')
+argparser.add_argument('-d', '--device', choices=['cpu', 'gpu'], default='cpu', type=str, metavar='', help='Device to use [gpu, cpu] (default=cpu)')
+argparser.add_argument('-s', '--save', action='store_true', help='Save output file')
+args = argparser.parse_args()
+
 
 MODEL_WEIGHTS = FCN_ResNet101_Weights.DEFAULT
 CLASS_NAMES = MODEL_WEIGHTS.meta['categories']
@@ -34,11 +44,16 @@ def filter_class(img_arr, class_name):
     img_arr[img_arr != class_int] = 0
     return img_arr
 
-# Load the model on GPU
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-if torch.cuda.is_available():
-    print("Using GPU")
+device = None
+if args.device == 'gpu':
+    # Load the model on GPU
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if torch.cuda.is_available():
+        print("Using GPU")
+    else:
+        print("No GPU available. Using CPU.")
 else:
+    device = torch.device('cpu')
     print("Using CPU")
 
 
@@ -64,11 +79,13 @@ output_predictions = output.argmax(0)
 output_predictions = output_predictions.byte().cpu().numpy()
 filtered = filter_class(output_predictions, 'person')
 
-r = Image.fromarray(output_predictions).resize(input_image.size)
-r = remove_bg(np.array(input_image, dtype=np.uint8), r)
-r = cv2.cvtColor(np.array(r), cv2.COLOR_RGB2BGR)
+output = Image.fromarray(output_predictions).resize(input_image.size)
+output = remove_bg(np.array(input_image, dtype=np.uint8), output)
+output = cv2.cvtColor(np.array(output), cv2.COLOR_RGB2BGR)
 
-cv2.imwrite('./images/output/example_output.png', r) # Save image in RGB format
-cv2.imshow('image', r)
+if args.save:
+    cv2.imwrite('./images/output/example_output.png', output) # Save image in RGB format
+
+cv2.imshow('Output image', output)
 if cv2.waitKey(0):
     cv2.destroyAllWindows()
