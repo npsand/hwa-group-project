@@ -34,10 +34,13 @@ def change_bg(image, segmented_image, bg_image=None):
     mask = cv2.cvtColor(segmented_image, cv2.COLOR_BGR2GRAY)
     mask = cv2.threshold(mask, 10, 255, cv2.THRESH_BINARY)[1]
 
-    if bg_image == None:
+    if bg_image is None:
         # Add green background to the segmented image
         bg_image = np.zeros(image.shape, np.uint8)
         bg_image[:] = (0, 255, 0)
+    else:
+        bg_image = cv2.resize(bg_image, (image.shape[0], image.shape[1]))
+    print(bg_image[:30])
 
     # Crop image and add the background
     output_image = cv2.bitwise_and(image, image, dst=bg_image, mask=mask)
@@ -85,8 +88,12 @@ output_predictions = output.argmax(0)
 output_predictions = output_predictions.byte().cpu().numpy()
 filtered = filter_class(output_predictions, args.crop_object)
 
+bg_image = None
+if args.background_image:
+    bg_image = cv2.imread(args.background_image)
+
 output = Image.fromarray(output_predictions).resize(input_image.size)
-output = change_bg(np.array(input_image, dtype=np.uint8), output)
+output = change_bg(np.array(input_image, dtype=np.uint8), output, bg_image)
 output = cv2.cvtColor(np.array(output), cv2.COLOR_RGB2BGR)
 
 if args.save:
