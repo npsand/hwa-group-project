@@ -6,24 +6,21 @@ import cv2
 import numpy as np
 import argparse
 
-
-obj_classes =  ['__background__', 'aeroplane', 'bicycle', 'bird', 'boat',
+MODEL_WEIGHTS = FCN_ResNet101_Weights.DEFAULT
+CLASS_NAMES = MODEL_WEIGHTS.meta['categories']
+# https://stackoverflow.com/questions/36459969/how-to-convert-a-list-to-a-dictionary-with-indexes-as-values
+CLASS_NAMES_DICT = {k: v for v, k in enumerate(CLASS_NAMES)}
+"""obj_classes =  ['__background__', 'aeroplane', 'bicycle', 'bird', 'boat',
                 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable',
                 'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep',
-                'sofa', 'train', 'tvmonitor']
+                'sofa', 'train', 'tvmonitor']"""
 argparser = argparse.ArgumentParser()
 argparser.add_argument('-c', '--crop-image', type=str, metavar='', required=True, help='Path to image of objects to be cropped out')
 argparser.add_argument('-bg', '--background-image', type=str, metavar='',  help='Path to background image to place the cropped objects on. Default is a green background.')
 argparser.add_argument('-d', '--device', choices=['cpu', 'gpu'], default='cpu', type=str, help='Device to use (default=cpu)')
 argparser.add_argument('-s', '--save', action='store_true', help='Save output file')
-argparser.add_argument('-o', '--crop-object', type=str, metavar='', choices=obj_classes, help=f'Object to be cropped from the image. List of objects: {obj_classes}')
+argparser.add_argument('-o', '--crop-object', type=str, metavar='', required=True, choices=CLASS_NAMES, help=f'Object to be cropped from the image. List of objects: {CLASS_NAMES}')
 args = argparser.parse_args()
-
-
-MODEL_WEIGHTS = FCN_ResNet101_Weights.DEFAULT
-CLASS_NAMES = MODEL_WEIGHTS.meta['categories']
-# https://stackoverflow.com/questions/36459969/how-to-convert-a-list-to-a-dictionary-with-indexes-as-values
-CLASS_NAMES_DICT = {k: v for v, k in enumerate(CLASS_NAMES)}
 
 
 def change_bg(image, segmented_image, bg_image=None):
@@ -39,8 +36,9 @@ def change_bg(image, segmented_image, bg_image=None):
         bg_image = np.zeros(image.shape, np.uint8)
         bg_image[:] = (0, 255, 0)
     else:
-        bg_image = cv2.resize(bg_image, (image.shape[0], image.shape[1]))
-    print(bg_image[:30])
+        bg_image = cv2.resize(bg_image, (image.shape[1], image.shape[0]))
+        bg_image = cv2.cvtColor(bg_image, cv2.COLOR_BGR2RGB)
+    
 
     # Crop image and add the background
     output_image = cv2.bitwise_and(image, image, dst=bg_image, mask=mask)
